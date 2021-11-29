@@ -16,7 +16,7 @@ PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('CHAT_ID')
 
-RETRY_TIME = 600
+RETRY_TIME = 10
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
@@ -48,7 +48,7 @@ def send_message(bot, message):
 
 def get_api_answer(current_timestamp):
     """Делает запрос к эндпоинту."""
-    timestamp = current_timestamp or int(time.time())
+    timestamp = current_timestamp
     params = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
@@ -68,6 +68,7 @@ def check_response(response):
     except KeyError as e:
         msg = f'Ошибка доступа по ключу homeworks: {e}'
         logger.error(msg)
+        raise exceptions.CheckResponseException(msg)
     if homeworks_list is None:
         msg = 'В ответе API нет словаря с домашками'
         logger.error(msg)
@@ -117,7 +118,7 @@ def main():
         raise exceptions.MissingRequiredTokenException(msg)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time())
+    current_timestamp = int(time.time() - 604800)
     previous_status = None
     previous_error = None
 
@@ -125,11 +126,10 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
         except exceptions.IncorrectAPIResponseException as e:
-            if e != previous_error:
-                previous_error = e
+            if str(e) != previous_error:
+                previous_error = str(e)
                 send_message(bot, e)
             logger.error(e)
-            current_timestamp = int(time.time())
             time.sleep(RETRY_TIME)
             continue
         try:
@@ -142,16 +142,14 @@ def main():
             else:
                 logger.debug('Обновления статуса нет')
 
-            current_timestamp = int(time.time())
             time.sleep(RETRY_TIME)
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            if previous_error != error:
-                previous_error = error
+            if previous_error != str(error):
+                previous_error = str(error)
                 send_message(bot, message)
             logger.error(message)
-            current_timestamp = int(time.time())
             time.sleep(RETRY_TIME)
 
 
