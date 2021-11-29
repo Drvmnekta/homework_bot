@@ -32,3 +32,9 @@ class IncorrectAPIResponseException(Exception):
     """Исключение некорректного ответа API."""
 
     pass
+
+
+class EmptyHWNameOrStatus(Exception):
+    """Исключение None значения имени или статуса домашки."""
+
+    pass
