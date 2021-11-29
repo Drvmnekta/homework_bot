@@ -50,9 +50,10 @@ def get_api_answer(current_timestamp):
     """Делает запрос к эндпоинту."""
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
-    # я не понимаю, как тут совместить try-except, который хочешь ты
-    # и проверку по статусу, которую хочет pytest
-    response = requests.get(ENDPOINT, headers=HEADERS, params=params)
+    try:
+        response = requests.get(ENDPOINT, headers=HEADERS, params=params)
+    except exceptions.APIResponseStatusCodeException:
+        logger.error('Сбой при запросе к эндпоинту')
     if response.status_code != HTTPStatus.OK:
         msg = 'Сбой при запросе к эндпоинту'
         logger.error(msg)
