@@ -7,6 +7,7 @@ import telegram
 from dotenv import load_dotenv
 
 # from logging.handlers import RotatingFileHandler
+import exceptions
 
 
 load_dotenv()
@@ -45,7 +46,7 @@ def send_message(bot, message):
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logger.info('Сообщение в чат отправлено')
-    except Exception:
+    except exceptions.SendMessageFailure:
         logger.error('Сбой при отправке сообщения в чат')
 
 
@@ -57,29 +58,28 @@ def get_api_answer(current_timestamp):
 
     response = requests.get(ENDPOINT, headers=HEADERS, params=params)
     if response.status_code != 200:
-        msg = 'Сбой при запросе к эндпоинту'
+        msg = f'Сбой при запросе к эндпоинту {response.status_code}'
         logger.error(msg)
-        raise Exception(msg)
-    response = response.json()
-    return response
+        raise exceptions.APIResponseStatusCodeException(msg)
+    return response.json()
 
 
 def check_response(response):
     """Проверяет ответ API на корректность."""
-    homeworks_dict = response['homeworks']
-    if homeworks_dict is None:
+    homeworks_list = response['homeworks']
+    if homeworks_list is None:
         msg = 'В ответе API нет словаря с домашками'
         logger.error(msg)
-        raise Exception(msg)
-    if homeworks_dict == []:
+        raise exceptions.CheckResponseException(msg)
+    if homeworks_list == []:
         msg = 'За последнее время нет домашек'
         logger.error(msg)
-        raise Exception(msg)
-    if not isinstance(homeworks_dict, list):
+        raise exceptions.CheckResponseException(msg)
+    if not isinstance(homeworks_list, list):
         msg = 'В ответе API домашки представлены не списком'
         logger.error(msg)
-        raise Exception(msg)
-    return homeworks_dict
+        raise exceptions.CheckResponseException(msg)
+    return homeworks_list
 
 
 def parse_status(homework):
@@ -94,8 +94,7 @@ def parse_status(homework):
         msg = 'Неизвестный статус домашки'
         logger.error(msg)
         verdict = 'Неизвестный статус'
-        raise Exception(msg)
-
+        raise exceptions.UnknownHWStatusException(msg)
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -111,18 +110,30 @@ def main():
     if not check_tokens():
         msg = 'Отсутствует необходимая переменная среды'
         logger.critical(msg)
-        raise Exception(msg)
+        raise exceptions.MissingRequiredTokenException(msg)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    previous_response = None
+    previous_status = None
+    previous_error = None
 
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            check_response(response)
-            if response != previous_response:
-                message = parse_status(response.get('homeworks')[0])
+        except exceptions.IncorrectAPIResponseException as e:
+            if e != previous_error:
+                previous_error = e
+            logger.error(e)
+            send_message(bot, e)
+            current_timestamp = int(time.time())
+            time.sleep(RETRY_TIME)
+            continue
+        try:
+            homeworks = check_response(response)
+            hw_status = homeworks[0].get('status')
+            if hw_status != previous_status:
+                previous_status = hw_status
+                message = parse_status(homeworks[0])
                 send_message(bot, message)
             else:
                 logger.debug('Обновления статуса нет')
@@ -131,8 +142,11 @@ def main():
             time.sleep(RETRY_TIME)
 
         except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            send_message(bot, message)
+            if previous_error != error:
+                previous_error = error
+                message = f'Сбой в работе программы: {error}'
+                send_message(bot, message)
+            current_timestamp = int(time.time())
             time.sleep(RETRY_TIME)
         # else:
         #    ...
