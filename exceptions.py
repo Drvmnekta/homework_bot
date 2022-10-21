@@ -1,40 +1,43 @@
+"""Module with custom exceptions."""
+
+
 class SendMessageFailure(Exception):
-    """Исключение отправки сообщения."""
+    """Send message failure exception."""
 
     pass
 
 
 class APIResponseStatusCodeException(Exception):
-    """Исключение сбоя запроса к API."""
+    """API status code exception."""
 
     pass
 
 
 class CheckResponseException(Exception):
-    """Исключение неверного формата ответа API."""
+    """Wrong API response format exception."""
 
     pass
 
 
 class UnknownHWStatusException(Exception):
-    """Исключение неизвестного статуса домашки."""
+    """Unknown homework status exception."""
 
     pass
 
 
 class MissingRequiredTokenException(Exception):
-    """Исключение отсутствия необходимых переменных среды."""
+    """Environment variables unavaliable exception."""
 
     pass
 
 
 class IncorrectAPIResponseException(Exception):
-    """Исключение некорректного ответа API."""
+    """Incorrect API response exception."""
 
     pass
 
 
 class EmptyHWNameOrStatus(Exception):
-    """Исключение None значения имени или статуса домашки."""
+    """None homework name or status exception."""
 
     pass
